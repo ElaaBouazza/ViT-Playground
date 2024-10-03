@@ -131,9 +131,9 @@ where $⊙$ denotes element-wise multiplication: the entries of $l_W$
 
 |    model       |  acc   |
 |:--------------:|:------:|
-|  Full model    |  0.97  |
-| Classification head  |  ----  |
-| Injected model |  ----  |
+|  Full model    |  0.455  |
+| Classification head  |  0.858  |
+| Injected model |  CUDA OUTA MEMORY LOL WAIT FOR A GPU TO FREE UPs  |
 
 </p>
 
