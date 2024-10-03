@@ -467,12 +467,25 @@ class ViTransformer(pl.LightningModule):
         self.model.load_from(np.load(_resolve_path(self.config.model.checkpoint)))
         self.loss_fct = nn.CrossEntropyLoss()
         
+        for param in self.model.transformer.parameters():
+            param.requires_grad = False
+            #TASK 5: Freezing the encoder
+        self.new_head = nn.Sequential(
+            nn.Linear(self.model.head.in_features, 512),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(512, 10)
+        )
+        #TASK 5: NEW CLASSIFICATION HEAD
+        self.model.head = self.new_head
+        
 
     def simple_accuracy(self, preds, labels):
         return (preds == labels).mean()
 
     def configure_optimizers(self):
-        optim = Adam(self.parameters(), 
+        #TASK 5 OPTIMIZER SHOULD ONLY TAKE IN THE NEW HEAD
+        optim = Adam(self.new_head.parameters(), 
                         lr=self.config.training.learning_rate)
         if self.config.training.lr_scheduler.name == "cosine":
             scheduler = CosineAnnealingLR(optim, 
