@@ -512,7 +512,7 @@ class ViTransformer(pl.LightningModule):
 
     def configure_optimizers(self):
         #TASK 5 OPTIMIZER SHOULD ONLY TAKE IN THE NEW HEAD
-        #TASK6 + injection params
+        #TASK7 + injection params: ensures injection params are also trainable 
         params = [p for n, p in self.model.named_parameters() if p.requires_grad]
         optim = Adam(params, 
                         lr=self.config.training.learning_rate)
