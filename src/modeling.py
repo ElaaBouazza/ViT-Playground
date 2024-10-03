@@ -493,7 +493,7 @@ class ViTransformer(pl.LightningModule):
         self.loss_fct = nn.CrossEntropyLoss()
         
         #TASK 6: Added injection param to the non frozen ones
-        for name, param in self.model.transformer.parameters():
+        for name, param in self.model.named_parameters():
             if 'injection' not in name and 'head' not in name:
                 param.requires_grad = False
         #TASK 5: Freezing the encoder
@@ -512,7 +512,7 @@ class ViTransformer(pl.LightningModule):
 
     def configure_optimizers(self):
         #TASK 5 OPTIMIZER SHOULD ONLY TAKE IN THE NEW HEAD
-        #TASK7 + injection params: ensures injection params are also trainable 
+        #TASK6 + injection params
         params = [p for n, p in self.model.named_parameters() if p.requires_grad]
         optim = Adam(params, 
                         lr=self.config.training.learning_rate)
