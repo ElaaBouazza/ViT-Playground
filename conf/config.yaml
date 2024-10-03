@@ -1,0 +1,18 @@
+model:
+  checkpoint: "checkpoints/ViT-B_16.npz"
+
+data:
+  img_size: 224  # Do not change #
+  batch_size: 96
+
+training:
+  seed: 42
+  use_gpu: True
+  precision: "16-mixed"
+  max_epochs: 1
+  accumulate_grad_batches: 1
+  learning_rate: 1e-3
+  lr_scheduler:
+    name: "cosine"
+    T_max: 10
+    eta_min: 1e-6
