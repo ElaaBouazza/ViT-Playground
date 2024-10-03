@@ -36,7 +36,6 @@ def main(cfg: DictConfig):
     )
     trainer.fit(model, train_loader, val_loader)
     test_result = trainer.test(model, test_loader, ckpt_path='best')
-    print('best')
     print(f"Test accuracy: {test_result[0]['test_acc']:.4f}")
     # update_readme(test_result[0]['test_acc'])
 
