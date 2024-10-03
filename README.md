@@ -131,7 +131,7 @@ where $⊙$ denotes element-wise multiplication: the entries of $l_W$
 
 |    model       |  acc   |
 |:--------------:|:------:|
-|  Full model    |  0.301  |
+|  Full model    |  0.97  |
 | Classification head  |  ----  |
 | Injected model |  ----  |
 
