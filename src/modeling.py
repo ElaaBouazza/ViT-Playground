@@ -68,7 +68,14 @@ ACT2FN = {
     "swish": swish,
 }
 
-
+class Injection(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(dim))
+    
+    def forward(self, x):
+        return x * self.weight
+    
 class Attention(nn.Module):
     def __init__(self, config, vis):
         super(Attention, self).__init__()
@@ -94,6 +101,11 @@ class Attention(nn.Module):
         )
 
         self.softmax = Softmax(dim=-1)
+        
+        self.query_injection = Injection(self.all_head_size)
+        self.key_injection = Injection(self.all_head_size)
+        self.value_injection = Injection(self.all_head_size)
+        self.out_injection = Injection(config.hidden_size)
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (
@@ -104,9 +116,9 @@ class Attention(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states):
-        mixed_query_layer = self.query(hidden_states)
-        mixed_key_layer = self.key(hidden_states)
-        mixed_value_layer = self.value(hidden_states)
+        mixed_query_layer = self.query_injection(self.query(hidden_states))
+        mixed_key_layer = self.key_injection(self.key(hidden_states))
+        mixed_value_layer = self.value_injection(self.value(hidden_states))
 
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
@@ -129,6 +141,7 @@ class Attention(nn.Module):
         )
         context_layer = context_layer.view(*new_context_layer_shape)
         attention_output = self.out(context_layer)
+        attention_output = self.out_injection(attention_output)
         attention_output = self.proj_dropout(attention_output)
         return attention_output, weights
 
@@ -144,7 +157,10 @@ class Mlp(nn.Module):
         )
         self.act_fn = ACT2FN["gelu"]
         self.dropout = Dropout(config.transformer["dropout_rate"])
-
+        
+        self.fc1_injection = Injection(config.transformer["mlp_dim"])
+        self.fc2_injection = Injection(config.hidden_size)
+        
         self._init_weights()
 
     def _init_weights(self):
@@ -155,9 +171,11 @@ class Mlp(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
+        x = self.fc1_injection(x)
         x = self.act_fn(x)
         x = self.dropout(x)
         x = self.fc2(x)
+        x = self.fc2_injection(x)
         x = self.dropout(x)
         return x
 
@@ -224,16 +242,21 @@ class Block(nn.Module):
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn = Mlp(config)
         self.attn = Attention(config, vis)
+        self.attention_output_injection = Injection(config.hidden_size)
+        self.ffn_output_injection = Injection(config.hidden_size)
+
 
     def forward(self, x):
         h = x
         x = self.attention_norm(x)
         x, weights = self.attn(x)
+        x = self.attention_output_injection(x)
         x = x + h
 
         h = x
         x = self.ffn_norm(x)
         x = self.ffn(x)
+        x = self.ffn_output_injection(x)
         x = x + h
         return x, weights
 
@@ -354,9 +377,11 @@ class VisionTransformer(nn.Module):
 
         self.transformer = Transformer(config, config.img_size, vis)
         self.head = Linear(config.hidden_size, num_classes)
+        self.final_injection = Injection(config.hidden_size)
 
     def forward(self, x, labels=None):
         x, attn_weights = self.transformer(x)
+        x = self.final_injection(x)
         logits = self.head(x[:, 0])
 
         if labels is not None:
@@ -467,9 +492,11 @@ class ViTransformer(pl.LightningModule):
         self.model.load_from(np.load(_resolve_path(self.config.model.checkpoint)))
         self.loss_fct = nn.CrossEntropyLoss()
         
-        for param in self.model.transformer.parameters():
-            param.requires_grad = False
-            #TASK 5: Freezing the encoder
+        #TASK 6: Added injection param to the non frozen ones
+        for name, param in self.model.transformer.parameters():
+            if 'injection' not in name and 'head' not in name:
+                param.requires_grad = False
+        #TASK 5: Freezing the encoder
         self.new_head = nn.Sequential(
             nn.Linear(self.model.head.in_features, 512),
             nn.ReLU(),
@@ -485,7 +512,9 @@ class ViTransformer(pl.LightningModule):
 
     def configure_optimizers(self):
         #TASK 5 OPTIMIZER SHOULD ONLY TAKE IN THE NEW HEAD
-        optim = Adam(self.new_head.parameters(), 
+        #TASK6 + injection params
+        params = [p for n, p in self.model.named_parameters() if p.requires_grad]
+        optim = Adam(params, 
                         lr=self.config.training.learning_rate)
         if self.config.training.lr_scheduler.name == "cosine":
             scheduler = CosineAnnealingLR(optim, 
